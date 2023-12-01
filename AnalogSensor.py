@@ -53,7 +53,9 @@ while True:  # poll GPIO inputs at DELAY speed
                     EDGE_FLAG = 0 # Turn off EDGE_FLAG after first trigger to avoid multiple triggers while sensor value holds
             elif (MAG_FLAG and EDGE_FLAG): # on a magnet signal edge (edge = 1 to start)
                     T_e = time.time()
-                    print("RPM[{}]".format(RPM(T_s,T_e)))
+                    RPM = RPM(T_s,T_e)
+                    Length += LineLength(T_s,T_e,RPM) # ASSUMES SINGLE ROTATIONAL DIRECTION! Multiply by 'dir' variable if switching rotation
+                    print("RPM[{}], Length[{}]".format(RPM,Length))
                     MAG_FLAG = 0 # Magnet timer has stopped
         elif(MAG.value()!=0): # magnet away from sensor
            EDGE_FLAG = 1 # Resensitize triggers to wait for next edge
