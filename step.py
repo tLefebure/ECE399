@@ -22,9 +22,14 @@ BIN2 = Pin(15,Pin.OUT)
 
 BTN = Pin(3, Pin.IN)
 
-stepPos = 0
+stepPos = 1
+stepMax = 100
+stepMin = 0
+dir = 1
 
-stepList = [[1,0,0,0],[0,0,0,1],[0,1,0,0],[0,0,1,0]]
+#Working: #stepList = [[1,0,0,0],[0,0,0,1],[0,1,0,0],[0,0,1,0]] # [BIN2,BIN1,AIN2,AIN1]
+stepList = [[1,0,0,1],[0,1,0,1],[0,1,1,0],[1,0,1,0]] # [BIN2,BIN1,AIN2,AIN1]
+
 step = [stepList[0]]
 brake = [1,1,1,1]
 
@@ -39,17 +44,19 @@ def step():
         
 while True:
     if(BTN.value()):
-        step()
-        stepPos+=1
+        step()    
+        if(stepPos == stepMax or stepPos == stepMin):
+            dir = dir * -1
+        stepPos+=dir
         LED.toggle()
-        print(step)        
+        print("dir")
+        print(dir)
+        print("stepPos")
+        print(stepPos)
     else:
         AIN1.value(1)
         AIN2.value(1)
         BIN1.value(1)
         BIN2.value(1)
-        print("Brake!")
         LED.value(0)
-        
     
-
