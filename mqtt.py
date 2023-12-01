@@ -10,7 +10,7 @@ led_status = False # off
 
 while(not wlan.isconnected()):
     time.sleep(5)
-    wlan.connect("StarNet","smedLey2")
+    wlan.connect("#####","#####")
 
 mqtt_server = '10.0.0.250'
 client_id = 'ECE399G19'
@@ -18,6 +18,8 @@ topic_pub = b'topic/hello'
 topic_sub1 = b'topic/controltest'
 topic_sub2 = b'topic/inputtest'
 topic_msg = b'MQTT test for ECE 399 G19'
+
+
 
 def mqtt_connect():
        client = MQTTClient(client_id, mqtt_server,1883,"ECE399G19", "ECE399G19", keepalive=3600)
