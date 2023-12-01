@@ -4,6 +4,14 @@ import machine
 from umqtt.simple import MQTTClient
 from picozero import pico_temp_sensor, pico_led
 
+# GLOBALS
+DELAY = 0.01
+PI = 3.14
+Radius = 0.01 # set this to the average radius of the coil in [m] (~1 cm)
+MAG_FLAG = 0
+EDGE_FLAG = 1
+STEPS = 200
+
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
 wind = False # raise bottle
@@ -12,15 +20,14 @@ mqttCheck = False # check for MQTT message
 # Timer as to not overload the Pico with requests/receives
 timer = machine.Timer(period = 2000, mode = machine.Timer.PERIODIC, callback = lambda t:mqttCheck = True)
 
-DELAY = 0.01
-STEPS = 200
-
 LED = machine.Pin("LED",machine.Pin.OUT)
 
 AIN1 = machine.Pin(17,machine.Pin.OUT)
 AIN2 = machine.Pin(16,machine.Pin.OUT)
 BIN1 = machine.Pin(14,machine.Pin.OUT)
 BIN2 = machine.Pin(15,machine.Pin.OUT)
+
+MAG = machine.Pin(12, machine.Pin.IN)
 
 BTN = machine.Pin(3, machine.Pin.IN)
 
@@ -31,11 +38,21 @@ stepMin = 0
 
 stepList = [[1,0,0,1],[0,1,0,1],[0,1,1,0],[1,0,1,0]] # [BIN2,BIN1,AIN2,AIN1]
 
+# FUNCTIONS
+def lineLength(T_s,T_e,RPM):
+        meters = radius * 2 * PI * RPM * (T_e - T_s) / 60 # Estimate reel length via (circumference * # of rotations)
+        return meters
+
+def RPM(T_s,T_e):
+        RPS = T_e - T_s
+        RPM = 60 * RPS
+        return RPM
+
 while(not wlan.isconnected()):
     time.sleep(5)
-    wlan.connect("#####","#####")
+    wlan.connect("ECE399G19Demo","ECE399G19Demo")
 
-mqtt_server = '#####' # IP for MQTT server
+mqtt_server = '192.168.225.124' # IP for MQTT server
 client_id = 'ECE399G19'
 # Add sub and pub topics here
 topic_pub1 = b'topic/power'
@@ -92,19 +109,49 @@ while True:
 
     if wind:
         while stepPos < stepMax:
+            currMAG = MAG.value()
             step()
             stepPos += 1
+            if(MAG.value()==0): # magnet near sensor
+                print("Magnet detected!")
+                if ((not MAG_FLAG) and EDGE_FLAG):
+                    T_s = time.time()
+                    MAG_FLAG = 1 # Magnet timer has started
+                    EDGE_FLAG = 0 # Turn off EDGE_FLAG after first trigger to avoid multiple triggers while sensor value holds
+                elif (MAG_FLAG and EDGE_FLAG): # on a magnet signal edge (edge = 1 to start)
+                    T_e = time.time()
+                    RPM = RPM(T_s,T_e)
+                    Length += LineLength(T_s,T_e,RPM) # ASSUMES SINGLE ROTATIONAL DIRECTION! Multiply by 'dir' variable if switching rotation
+                    print("RPM[{}], Length[{}]".format(RPM,Length))
+                    MAG_FLAG = 0 # Magnet timer has stopped
+            elif(MAG.value()!=0): # magnet away from sensor
+               EDGE_FLAG = 1 # Resensitize triggers to wait for next edge
             client.publish(topic_pub3, 'Winding')
-            client.publish(topic_pub2, '10')
+            client.publish(topic_pub2, RPM.str.encode())
         wind = False
         # maybe insert braking mechanism here?
     elif unwind:
         while stepPos > stepMin:
+            currMAG = MAG.value()
             step()
             stepPos -= 1
+            if(MAG.value()==0): # magnet near sensor
+                print("Magnet detected!")
+                if ((not MAG_FLAG) and EDGE_FLAG):
+                    T_s = time.time()
+                    MAG_FLAG = 1 # Magnet timer has started
+                    EDGE_FLAG = 0 # Turn off EDGE_FLAG after first trigger to avoid multiple triggers while sensor value holds
+                elif (MAG_FLAG and EDGE_FLAG): # on a magnet signal edge (edge = 1 to start)
+                    T_e = time.time()
+                    RPM = RPM(T_s,T_e)
+                    Length += LineLength(T_s,T_e,RPM) # ASSUMES SINGLE ROTATIONAL DIRECTION! Multiply by 'dir' variable if switching rotation
+                    print("RPM[{}], Length[{}]".format(RPM,Length))
+                    MAG_FLAG = 0 # Magnet timer has stopped
+            elif(MAG.value()!=0): # magnet away from sensor
+               EDGE_FLAG = 1 # Resensitize triggers to wait for next edge
+            client.publish(topic_pub2, RPM.str.encode())
             client.publish(topic_pub4, 'Unwinding')
             client.publish(topic_pub1, '5')
-            cleint.publish(topic_pub2, '20')
         unwind = False
 
     # temp = pico_temp_sensor.temp # here for reference
